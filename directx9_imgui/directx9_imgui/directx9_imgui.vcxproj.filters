@@ -107,5 +107,6 @@
     <ClCompile Include="imgui\imgui_widgets.cpp">
       <Filter>directx9_imgui\imgui</Filter>
     </ClCompile>
+    <ClCompile Include="imgui\imgui_tables.cpp" />
   </ItemGroup>
 </Project>

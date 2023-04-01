@@ -1,27 +1,24 @@
 #pragma once
 #include <d3d9.h>
 
-#pragma comment (lib, "d3d9.lib" )
-#pragma comment (lib, "d3dx9.lib" )
-
 HWND window = nullptr;
 
-HMODULE hModule;
+HMODULE h_module;
 
 typedef HRESULT(APIENTRY* DrawIndexedPrimitive)(LPDIRECT3DDEVICE9, D3DPRIMITIVETYPE, INT, UINT, UINT, UINT, UINT);
-HRESULT APIENTRY DrawIndexedPrimitive_hook(LPDIRECT3DDEVICE9, D3DPRIMITIVETYPE, INT, UINT, UINT, UINT, UINT);
-DrawIndexedPrimitive DrawIndexedPrimitive_orig = 0;
+HRESULT APIENTRY draw_indexed_primitive_hook(LPDIRECT3DDEVICE9, D3DPRIMITIVETYPE, INT, UINT, UINT, UINT, UINT);
+DrawIndexedPrimitive draw_indexed_primitive_orig = 0;
 
 typedef HRESULT(APIENTRY* EndScene) (LPDIRECT3DDEVICE9);
-HRESULT APIENTRY EndScene_hook(LPDIRECT3DDEVICE9);
-EndScene EndScene_orig = 0;
+HRESULT APIENTRY end_scene_hook(LPDIRECT3DDEVICE9);
+EndScene end_scene_orig = 0;
 
 typedef HRESULT(APIENTRY* Reset)(LPDIRECT3DDEVICE9, D3DPRESENT_PARAMETERS*);
-HRESULT APIENTRY Reset_hook(LPDIRECT3DDEVICE9, D3DPRESENT_PARAMETERS*);
-Reset Reset_orig = 0;
+HRESULT APIENTRY reset_hook(LPDIRECT3DDEVICE9, D3DPRESENT_PARAMETERS*);
+Reset reset_orig = 0;
 
-typedef LRESULT(CALLBACK* WNDPROC)(HWND, UINT, WPARAM, LPARAM);
+typedef LRESULT(CALLBACK* window_proc)(HWND, UINT, WPARAM, LPARAM);
 
-WNDPROC oWndProc;
+window_proc old_window_proc;
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
