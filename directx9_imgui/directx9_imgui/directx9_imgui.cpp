@@ -7,13 +7,24 @@
 #include "imgui/imgui_impl_win32.h"
 
 #include "min_hook/include/MinHook.h"
-#include <string>
 
 LRESULT CALLBACK wnd_proc(const HWND h_wnd, const UINT u_msg, const WPARAM w_param, const LPARAM l_param) {
-
 	if (ImGui_ImplWin32_WndProcHandler(h_wnd, u_msg, w_param, l_param))
 		return true;
-	
+
+	if (ImGui::GetIO().KeyShift == true) {
+		HWND h_wnd = get_lunia_client_window();
+		auto result = SetWindowLongPtr(h_wnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(old_window_proc));
+		if (result == 0) {
+			MessageBox(nullptr, get_last_error_as_string().c_str(), TEXT("Unhooking"), MB_OK | MB_ICONQUESTION);
+		}
+		if(MH_DisableHook(MH_ALL_HOOKS) != MH_OK) { 
+			MessageBox(nullptr, TEXT("Problems while unhooking"), TEXT("Unhooking"), MB_OK | MB_ICONQUESTION);
+		}
+		FreeLibrary(dll_module);
+		return TRUE;
+	}
+
 	if (const ImGuiIO& io = ImGui::GetIO(); io.WantCaptureMouse || io.WantCaptureKeyboard) {
 		return TRUE;
 	}
@@ -21,9 +32,9 @@ LRESULT CALLBACK wnd_proc(const HWND h_wnd, const UINT u_msg, const WPARAM w_par
 	return CallWindowProc(old_window_proc, h_wnd, u_msg, w_param, l_param);
 }
 
-DWORD WINAPI direct_x_init()
+DWORD WINAPI direct_x_init(HMODULE p_h_module)
 {
-
+	dll_module = p_h_module;
 	while (GetModuleHandle(TEXT("d3d9.dll")) == nullptr)
 	{
 		Sleep(100);
@@ -31,7 +42,7 @@ DWORD WINAPI direct_x_init()
 
 	LPDIRECT3D9 d3d = nullptr;
 	LPDIRECT3DDEVICE9 d3ddev = nullptr;
-
+	 
 	const HWND tmp_wnd = CreateWindow(TEXT("BUTTON"), TEXT("Temp Window"), WS_SYSMENU | WS_MINIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, 300, 300, NULL, NULL, h_module, NULL);
 	if (tmp_wnd == nullptr)
 	{
@@ -114,19 +125,25 @@ std::wstring get_last_error_as_string()
 	return message;
 }
 
+HWND get_lunia_client_window() {
+	HWND h_wnd = nullptr;
+	while (h_wnd == nullptr)
+	{
+		h_wnd = FindWindow(nullptr, TEXT("Lunia"));
+		std::this_thread::sleep_for(std::chrono::seconds{ 1 });
+	}
+	return h_wnd;
+}
+
 HRESULT APIENTRY end_scene_hook(LPDIRECT3DDEVICE9 pD3D9) {
 	static bool init = true;
 	if (init)
 	{
 		init = false;
 		ImGui::CreateContext();
-		HWND h_wnd = nullptr;
-		while(h_wnd == nullptr)
-		{
-			h_wnd = FindWindow(nullptr, TEXT("Lunia"));
-			std::this_thread::sleep_for(std::chrono::seconds{ 1 });
-		}
-
+		
+		ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+		auto h_wnd = get_lunia_client_window();
 		old_window_proc = reinterpret_cast<window_proc>(SetWindowLongPtr(h_wnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(wnd_proc)));
 		if (old_window_proc == nullptr)
 		{
@@ -134,25 +151,28 @@ HRESULT APIENTRY end_scene_hook(LPDIRECT3DDEVICE9 pD3D9) {
 		}
 
 		ImGui_ImplWin32_Init(h_wnd);
-
 		ImGui_ImplDX9_Init(pD3D9);
 	}
-	const auto return_result = end_scene_orig(pD3D9);
+	pD3D9->Clear(0, NULL, D3DCLEAR_STENCIL, 0, 1.0f, 0);
+	auto result_return = end_scene_orig(pD3D9);
+	pD3D9->Clear(0, NULL, D3DCLEAR_STENCIL, 0, 1.0f, 0);
 
 	ImGui_ImplDX9_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 
-	ImGui::ShowDemoWindow(&menu);
-
-	ImGui::GetIO().MouseDrawCursor = menu;
+	ImGui::Begin("ImGui Window");
+	ImGui::End();
 
 	ImGui::EndFrame();
 	ImGui::Render();
-
+	pD3D9->Clear(0, NULL, D3DCLEAR_STENCIL, 0, 1.0f, 0);
 	ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
+	pD3D9->Clear(0, NULL, D3DCLEAR_STENCIL, 0, 1.0f, 0);
 
-	return return_result;
+	ImGui::UpdatePlatformWindows();
+	ImGui::RenderPlatformWindowsDefault();
+	return result_return;
 }
 
 HRESULT APIENTRY reset_hook(LPDIRECT3DDEVICE9 pD3D9, D3DPRESENT_PARAMETERS* pPresentationParameters) {
